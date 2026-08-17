@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FPL Draft 2026 — Live Board</title>
+<style>
+:root{
+  --fwd:#4db8e8; --mid:#7bc86c; --def:#c760b0; --gkp:#f6c99a;
+  --bg:#0f1621; --panel:#1a2433; --panel2:#222f42; --line:#2e3d54;
+  --txt:#e8eef6; --mut:#8ea1bd; --accent:#7bc86c; --warn:#e0a458;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--txt);font-size:14px}
+header{padding:12px 20px;background:linear-gradient(90deg,#141d2b,#1c2942);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+header h1{font-size:18px;margin:0;font-weight:700}
+.conn{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mut)}
+.conn .dot{width:9px;height:9px;border-radius:50%;background:#c0554f}
+.conn.live .dot{background:var(--accent)}
+.idbox{display:flex;align-items:center;gap:6px;margin-left:auto}
+.idbox select{padding:8px 10px;background:var(--panel);border:1px solid var(--line);border-radius:8px;color:var(--txt);font-weight:600}
+.tabs{display:flex;gap:4px}
+.tab{padding:8px 14px;background:var(--panel);border:1px solid var(--line);border-radius:8px;cursor:pointer;font-weight:600;color:var(--mut);user-select:none}
+.tab.active{background:var(--accent);color:#0d1a10;border-color:var(--accent)}
+main{padding:16px 20px}
+.view{display:none}.view.active{display:block}
+
+/* clock / pick bar */
+.clockbar{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.clockbar .big{font-size:16px;font-weight:800}
+.clockbar .big .who{color:var(--accent)}
+.pickform{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-left:auto}
+.pickform input{padding:9px 11px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--txt);min-width:180px}
+.pickform select{padding:9px 11px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--txt);font-weight:600}
+.btn{padding:9px 16px;border-radius:8px;border:none;font-weight:700;cursor:pointer}
+.btn-pick{background:var(--accent);color:#0d1a10}
+.btn-pick:disabled{opacity:.4;cursor:not-allowed}
+.btn-ghost{background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
+.waiting{margin-left:auto;color:var(--warn);font-weight:600}
+
+/* avail strip */
+.avail{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.availcard{flex:1;min-width:130px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.availcard .lab{font-weight:700;font-size:12px;display:flex;align-items:center;gap:6px}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.dot.FWD{background:var(--fwd)}.dot.MID{background:var(--mid)}.dot.DEF{background:var(--def)}.dot.GKP{background:var(--gkp)}
+.availcard .big{font-size:22px;font-weight:800;margin-top:4px}
+.availcard .sub{font-size:11px;color:var(--mut)}
+
+/* board */
+.board-wrap{overflow:auto;border:1px solid var(--line);border-radius:10px}
+.board{border-collapse:collapse;width:100%;min-width:720px}
+.board th,.board td{border:1px solid var(--line);padding:0;text-align:center}
+.board th{background:var(--panel2);padding:9px 6px;font-size:12px;position:sticky;top:0;z-index:2}
+.board td.pk{background:var(--panel2);color:var(--mut);font-weight:700;font-size:12px;position:sticky;left:0;z-index:1}
+.cell{min-width:88px;height:40px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#0d1a10;padding:2px 4px;line-height:1.1}
+.cell .pos{font-size:9px;font-weight:800;opacity:.7}
+.cell.FWD{background:var(--fwd)}.cell.MID{background:var(--mid)}.cell.DEF{background:var(--def);color:#fff}.cell.GKP{background:var(--gkp)}
+.cell.empty{background:transparent;color:var(--mut);font-weight:400}
+.board td.onclock{outline:2px solid var(--accent);outline-offset:-2px}
+
+/* teams grid */
+.teams-wrap{overflow:auto;border:1px solid var(--line);border-radius:10px}
+.teams{border-collapse:collapse;width:100%;min-width:720px}
+.teams th{background:var(--panel2);padding:10px 8px;font-size:13px;border:1px solid var(--line);position:sticky;top:0;z-index:2;white-space:nowrap}
+.teams th.me{background:#2e5d3a;color:#bff0c8}
+.teams td{border:1px solid var(--line);padding:0;vertical-align:top;min-width:120px}
+.teams td.rlab{background:var(--panel2);color:var(--mut);font-weight:700;font-size:11px;text-align:center;position:sticky;left:0;z-index:1;min-width:60px;padding:4px}
+.tcell{padding:5px 8px;font-size:12px;font-weight:600;color:#0d1a10;min-height:30px;display:flex;align-items:center;gap:6px}
+.tcell.FWD{background:var(--fwd)}.tcell.MID{background:var(--mid)}.tcell.DEF{background:var(--def);color:#fff}.tcell.GKP{background:var(--gkp)}
+.tcell.empty{background:transparent}
+.tcell .p{font-size:9px;font-weight:800;opacity:.75}
+.teams tfoot td{background:var(--panel2);font-size:11px;color:var(--mut);text-align:center;padding:6px 4px}
+.poslegend{display:flex;gap:14px;margin:12px 2px;flex-wrap:wrap;font-size:12px;color:var(--mut)}
+.poslegend span{display:flex;align-items:center;gap:6px}
+
+/* settings */
+.mgr-row{display:flex;gap:8px;margin-bottom:6px;align-items:center;max-width:420px}
+.mgr-row input{flex:1;padding:8px;background:var(--panel);border:1px solid var(--line);border-radius:6px;color:var(--txt)}
+.mgr-row .x{background:#7a2b2b;color:#fff;border:none;border-radius:6px;padding:8px 10px;cursor:pointer}
+.small{font-size:12px;color:var(--mut)}
+.warnbox{background:#3a2e1a;border:1px solid #6a5322;color:#f0d9a8;padding:10px 14px;border-radius:8px;margin:10px 0;font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <h1>⚽ FPL Draft 2026 — Live</h1>
+  <div class="conn" id="conn"><span class="dot"></span><span id="connTxt">connecting…</span></div>
+  <div class="idbox">
+    <span class="small">You are:</span>
+    <select id="whoSel"><option value="">— pick your manager —</option></select>
+  </div>
+  <div class="tabs">
+    <div class="tab active" data-view="board">Draft Board</div>
+    <div class="tab" data-view="teams">Teams</div>
+    <div class="tab" data-view="settings">Managers</div>
+  </div>
+</header>
+<main>
+
+<div class="clockbar" id="clockbar"></div>
+
+<section class="view active" id="view-board">
+  <div class="avail" id="availStrip"></div>
+  <div class="board-wrap"><table class="board" id="boardTable"></table></div>
+</section>
+
+<section class="view" id="view-teams">
+  <div class="poslegend">
+    <span><span class="dot GKP"></span>GKP</span><span><span class="dot DEF"></span>DEF</span>
+    <span><span class="dot MID"></span>MID</span><span><span class="dot FWD"></span>FWD</span>
+    <span class="small">Rows grouped by position (GKP → DEF → MID → FWD)</span>
+  </div>
+  <div class="teams-wrap"><table class="teams" id="teamsTable"></table></div>
+</section>
+
+<section class="view" id="view-settings">
+  <h3>Managers &amp; rounds</h3>
+  <p class="small">Order = round-1 draft order. Picks snake each round. Changes sync to everyone.</p>
+  <div class="warnbox" id="mgrWarn" style="display:none">Draft has picks in it — editing managers now can misalign the board. Best to only edit before the first pick, or Reset draft first.</div>
+  <div id="mgrList"></div>
+  <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
+    <button class="btn btn-ghost" id="addMgr">+ Add manager</button>
+    <button class="btn btn-pick" id="applyMgr">Save managers</button>
+    <button class="btn btn-ghost" id="resetDraft" style="margin-left:auto;background:#5a2a2a;color:#fff;border:none">Reset draft (clears all picks)</button>
+  </div>
+  <p class="small" style="margin-top:14px">Rounds:
+    <input id="rounds" type="number" value="15" min="1" max="30" style="width:60px;padding:6px;background:var(--panel);border:1px solid var(--line);border-radius:6px;color:var(--txt)">
+  </p>
+</section>
+</main>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAKq3WgK1ko9112KB0gRRoyhV5pIBPVhkg",
+  authDomain: "fpl-draft-2026.firebaseapp.com",
+  databaseURL: "https://fpl-draft-2026-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "fpl-draft-2026",
+  storageBucket: "fpl-draft-2026.firebasestorage.app",
+  messagingSenderId: "832381295901",
+  appId: "1:832381295901:web:5a60f79959d2d0f26bd5f4"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const ROOT = db.ref('draft');
+
+const POS=['GKP','DEF','MID','FWD'];
+const DEFAULT_MGRS=['Joe','Alex M','Alex F','Dan','Seb','Matt','Sam','Bayley','Flora'];
+
+// local identity only
+let ME = localStorage.getItem('fpl_me')||'';
+
+// live state mirror
+let S = {managers:DEFAULT_MGRS.slice(), rounds:15, picks:{}};
+
+// ---- connection status ----
+db.ref('.info/connected').on('value', s=>{
+  const c=document.getElementById('conn');
+  if(s.val()){c.classList.add('live');document.getElementById('connTxt').textContent='live';}
+  else{c.classList.remove('live');document.getElementById('connTxt').textContent='offline';}
+});
+
+// ---- seed if empty ----
+ROOT.once('value').then(snap=>{
+  if(!snap.exists()){
+    ROOT.set({managers:DEFAULT_MGRS, rounds:15, picks:{}});
+  }
+});
+
+// ---- live listener ----
+ROOT.on('value', snap=>{
+  const v=snap.val()||{};
+  S.managers = v.managers && v.managers.length ? v.managers : DEFAULT_MGRS.slice();
+  S.rounds = v.rounds || 15;
+  S.picks = v.picks || {};
+  renderAll();
+});
+
+// ---- snake helpers ----
+function snakeSeq(){const M=S.managers.length,R=S.rounds,seq=[];for(let r=0;r<R;r++){const o=[...Array(M).keys()];if(r%2)o.reverse();o.forEach(m=>seq.push(m));}return seq;}
+function pickCount(){return Object.keys(S.picks).length;}
+function onClockIdx(){const s=snakeSeq(),n=pickCount();return n<s.length?s[n]:null;}
+
+// ---- clock + pick form ----
+function renderClock(){
+  const bar=document.getElementById('clockbar');
+  const mi=onClockIdx();
+  if(mi===null){bar.innerHTML=`<div class="big">🏁 Draft complete — ${pickCount()} picks made.</div>
+     <button class="btn btn-ghost" onclick="undoLast()" style="margin-left:auto">↩ Undo last pick</button>`;return;}
+  const onClockName=S.managers[mi];
+  const myTurn = ME!=='' && ME===onClockName;
+  let right;
+  if(myTurn){
+    right=`<div class="pickform">
+      <input id="pName" placeholder="Player name…" autocomplete="off">
+      <select id="pPos"><option value="FWD">FWD</option><option value="MID">MID</option><option value="DEF">DEF</option><option value="GKP">GKP</option></select>
+      <button class="btn btn-pick" id="submitPick">Draft →</button>
+    </div>`;
+  } else if(ME===''){
+    right=`<div class="waiting">Select your manager (top-right) to draft.</div>`;
+  } else {
+    right=`<div class="waiting">⏳ Waiting for <b>${onClockName}</b>…</div>`;
+  }
+  bar.innerHTML=`<div class="big">Pick #${pickCount()+1} · On the clock: <span class="who">${onClockName}</span></div>
+    ${right}
+    <button class="btn btn-ghost" onclick="undoLast()">↩ Undo</button>`;
+  if(myTurn){
+    const inp=document.getElementById('pName');
+    document.getElementById('submitPick').onclick=submitPick;
+    inp.addEventListener('keydown',e=>{if(e.key==='Enter')submitPick();});
+    inp.focus();
+  }
+}
+function submitPick(){
+  const name=document.getElementById('pName').value.trim();
+  const pos=document.getElementById('pPos').value;
+  if(!name)return;
+  const mi=onClockIdx();
+  if(mi===null||S.managers[mi]!==ME){alert('Not your turn anymore — board moved on.');return;}
+  // transaction to append safely at overall = count+1
+  ROOT.child('picks').transaction(cur=>{
+    cur=cur||{};
+    const overall=Object.keys(cur).length+1;
+    // guard: still our turn?
+    cur[overall]={name,pos,mgrIdx:mi,by:ME,ts:Date.now()};
+    return cur;
+  });
+}
+function undoLast(){
+  ROOT.child('picks').transaction(cur=>{
+    cur=cur||{};const keys=Object.keys(cur).map(Number);
+    if(!keys.length)return cur;
+    const max=Math.max(...keys);delete cur[max];return cur;
+  });
+}
+
+// ---- availability by position ----
+function renderAvail(){
+  const strip=document.getElementById('availStrip');
+  const cnt={GKP:0,DEF:0,MID:0,FWD:0};
+  Object.values(S.picks).forEach(p=>{if(cnt[p.pos]!=null)cnt[p.pos]++;});
+  strip.innerHTML=['FWD','MID','DEF','GKP'].map(pos=>`<div class="availcard">
+    <div class="lab"><span class="dot ${pos}"></span>${pos}</div>
+    <div class="big">${cnt[pos]}</div>
+    <div class="sub">${pos} drafted so far</div></div>`).join('');
+}
+
+// ---- board ----
+function renderBoard(){
+  const M=S.managers.length,oc=pickCount()+1;
+  const byOverall={};Object.entries(S.picks).forEach(([k,p])=>byOverall[+k]=p);
+  let html='<thead><tr><th class="pk">#</th>'+S.managers.map(m=>`<th${m===ME?' style="color:var(--accent)"':''}>${m}</th>`).join('')+'</tr></thead><tbody>';
+  for(let r=0;r<S.rounds;r++){
+    html+=`<tr><td class="pk">${r+1}</td>`;
+    for(let m=0;m<M;m++){
+      const order=r%2?[...Array(M).keys()].reverse():[...Array(M).keys()];
+      const overall=r*M+order.indexOf(m)+1,pl=byOverall[overall],oncl=overall===oc?'onclock':'';
+      html+=pl?`<td class="${oncl}"><div class="cell ${pl.pos}" title="Overall #${overall}"><span class="pos">${pl.pos}</span>${pl.name}</div></td>`
+             :`<td class="${oncl}"><div class="cell empty">${overall===oc?'⏱ '+overall:overall}</div></td>`;
+    }
+    html+='</tr>';
+  }
+  document.getElementById('boardTable').innerHTML=html+'</tbody>';
+}
+
+// ---- teams grid, grouped by position ----
+function renderTeams(){
+  const M=S.managers.length;
+  const ros=S.managers.map((m,mi)=>Object.entries(S.picks).filter(([k,p])=>p.mgrIdx===mi)
+     .sort((a,b)=>a[0]-b[0]).map(([k,p])=>p));
+  // order each roster GKP,DEF,MID,FWD
+  const ordered=ros.map(r=>{const o=[];POS.forEach(pos=>r.filter(p=>p.pos===pos).forEach(p=>o.push(p)));return o;});
+  const maxLen=Math.max(1,...ordered.map(r=>r.length));
+  let html='<thead><tr><th class="rlab"></th>'+
+    S.managers.map(m=>`<th class="${m===ME?'me':''}">${m===ME?'⭐ ':''}${m}</th>`).join('')+'</tr></thead><tbody>';
+  for(let i=0;i<maxLen;i++){
+    html+=`<tr><td class="rlab">${i+1}</td>`;
+    for(let m=0;m<M;m++){
+      const p=ordered[m][i];
+      html+=p?`<td><div class="tcell ${p.pos}"><span class="p">${p.pos}</span>${p.name}</div></td>`
+             :`<td><div class="tcell empty"></div></td>`;
+    }
+    html+='</tr>';
+  }
+  html+='</tbody><tfoot><tr><td>By pos</td>'+S.managers.map((m,mi)=>{
+    const c={FWD:0,MID:0,DEF:0,GKP:0};ros[mi].forEach(p=>c[p.pos]++);
+    return `<td>G${c.GKP} · D${c.DEF} · M${c.MID} · F${c.FWD}<br>(${ros[mi].length})</td>`;
+  }).join('')+'</tr></tfoot>';
+  document.getElementById('teamsTable').innerHTML=html;
+}
+
+// ---- who selector ----
+function renderWho(){
+  const sel=document.getElementById('whoSel');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">— pick your manager —</option>'+S.managers.map(m=>`<option value="${m}">${m}</option>`).join('');
+  sel.value = S.managers.includes(ME)?ME:'';
+}
+document.getElementById('whoSel').onchange=e=>{ME=e.target.value;localStorage.setItem('fpl_me',ME);renderClock();renderBoard();renderTeams();};
+
+// ---- settings ----
+function renderSettings(){
+  document.getElementById('mgrWarn').style.display=pickCount()>0?'block':'none';
+  document.getElementById('mgrList').innerHTML=S.managers.map((m,i)=>`<div class="mgr-row">
+    <span class="small" style="width:20px">${i+1}</span>
+    <input value="${m}" class="mgrInput"><button class="x" onclick="rmMgr(${i})">✕</button></div>`).join('');
+  document.getElementById('rounds').value=S.rounds;
+}
+function rmMgr(i){S.managers.splice(i,1);renderSettings();}
+document.getElementById('addMgr').onclick=()=>{S.managers.push('New');renderSettings();};
+document.getElementById('applyMgr').onclick=()=>{
+  const names=[...document.querySelectorAll('.mgrInput')].map(x=>x.value.trim()).filter(Boolean);
+  const rounds=parseInt(document.getElementById('rounds').value)||15;
+  ROOT.update({managers:names, rounds});
+};
+document.getElementById('resetDraft').onclick=()=>{
+  if(confirm('Clear ALL picks for everyone? This cannot be undone.'))ROOT.child('picks').set({});
+};
+
+// ---- tabs ----
+function switchView(v){document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view===v));document.querySelectorAll('.view').forEach(s=>s.classList.remove('active'));document.getElementById('view-'+v).classList.add('active');}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>switchView(t.dataset.view));
+
+function renderAll(){renderWho();renderClock();renderAvail();renderBoard();renderTeams();renderSettings();}
+renderAll();
+</script>
+</body>
+</html>
